@@ -8,7 +8,7 @@
 
 Esta é uma API RESTful desenvolvida em Python utilizando o microframework **Flask**. O projeto foi estruturado para servir como base para aplicações escaláveis, focando em organização de código e boas práticas.
 
-O objetivo principal desta aplicação é [Descreva aqui o objetivo: ex: gerenciar cadastro de clientes, processar dados de automação, servir um front-end, etc].
+O objetivo principal desta aplicação é criar uma API com os dados tratados e apresentados.
 
 ## 🚀 Tecnologias Utilizadas
 
@@ -20,7 +20,7 @@ O objetivo principal desta aplicação é [Descreva aqui o objetivo: ex: gerenci
 ## ⚙️ Funcionalidades
 
 * [x] Setup inicial e configurações de ambiente
-* [ ] Rotas básicas (CRUD)
+* [ ] Rotas básicas
 * [ ] Tratamento de erros
 * [ ] Conexão com Banco de Dados (se aplicável)
 
