@@ -1,0 +1,150 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "title": "API de M\u00e9tricas ANTT",
+        "description": "API RESTful para acesso aos dados de m\u00e9tricas de seguran\u00e7a e infraestrutura.",
+        "version": "1.0.0"
+    },
+    "basePath": "/",
+    "schemes": [
+        "http"
+    ],
+    "paths": {
+        "/api/v1/fileservermetrics": {
+            "get": {
+                "tags": [
+                    "FileServerMetrics"
+                ],
+                "summary": "Lista todas as m\u00e9tricas",
+                "responses": {
+                    "200": {
+                        "description": "Sucesso",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/FileServerMetric"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/securityalerts": {
+            "get": {
+                "tags": [
+                    "SecurityAlerts"
+                ],
+                "summary": "Lista alertas",
+                "responses": {
+                    "200": {
+                        "description": "Sucesso",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/SecurityAlert"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admetrics": {
+            "get": {
+                "tags": [
+                    "ADMetrics"
+                ],
+                "summary": "Lista m\u00e9tricas AD",
+                "responses": {
+                    "200": {
+                        "description": "Sucesso",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/ADMetric"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "FileServerMetric": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer",
+                    "format": "int64",
+                    "readOnly": true
+                },
+                "date": {
+                    "type": "string",
+                    "description": "Data da m\u00e9trica"
+                },
+                "file_server": {
+                    "type": "string"
+                },
+                "no_of_folders": {
+                    "type": "integer"
+                },
+                "no_of_files": {
+                    "type": "integer"
+                },
+                "no_of_permission_entries": {
+                    "type": "integer"
+                },
+                "size_of_all_files_and_folders_gb": {
+                    "type": "number",
+                    "format": "float"
+                }
+            },
+            "required": [
+                "date",
+                "file_server",
+                "no_of_folders",
+                "no_of_files"
+            ]
+        },
+        "SecurityAlert": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer",
+                    "format": "int64",
+                    "readOnly": true
+                },
+                "threat_model_name": {
+                    "type": "string"
+                },
+                "alert_time": {
+                    "type": "string"
+                },
+                "alert_severity": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "ADMetric": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer",
+                    "format": "int64",
+                    "readOnly": true
+                },
+                "domain_name": {
+                    "type": "string"
+                },
+                "no_of_users": {
+                    "type": "integer"
+                },
+                "no_of_disabled_users": {
+                    "type": "integer"
+                }
+            }
+        }
+    }
+}
