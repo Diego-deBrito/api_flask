@@ -23,64 +23,169 @@ api = Api(app)
 # 2. GERADOR DO ARQUIVO SWAGGER.JSON
 # ==============================================================================
 def generate_swagger_spec():
-    # Definições de Esquemas (Models)
+    # Definições de Esquemas (Models) - versão profissional e compacta
     definitions = {
         "FileServerMetric": {
             "type": "object",
             "properties": {
-                "id": {"type": "integer", "format": "int64", "readOnly": True},
-                "date": {"type": "string", "description": "Data da métrica"},
+                "date": {"type": "string", "format": "date", "description": "Data da métrica"},
                 "file_server": {"type": "string"},
                 "no_of_folders": {"type": "integer"},
                 "no_of_files": {"type": "integer"},
                 "no_of_permission_entries": {"type": "integer"},
-                "size_of_all_files_and_folders_gb": {"type": "number", "format": "float"}
-            },
-            "required": ["date", "file_server", "no_of_folders", "no_of_files"]
+                "size_of_all_files_and_folders": {"type": "number", "format": "float", "description": "GB"}
+            }
         },
         "SecurityAlert": {
             "type": "object",
             "properties": {
-                "id": {"type": "integer", "format": "int64", "readOnly": True},
                 "threat_model_name": {"type": "string"},
-                "alert_time": {"type": "string"},
+                "alert_time": {"type": "string", "format": "date-time"},
+                "file_server_domain": {"type": "string"},
+                "user_name": {"type": "string"},
                 "alert_severity": {"type": "string"},
+                "alert_category": {"type": "string"},
                 "status": {"type": "string"}
             }
         },
         "ADMetric": {
             "type": "object",
             "properties": {
-                "id": {"type": "integer", "format": "int64", "readOnly": True},
+                "date": {"type": "string", "format": "date"},
                 "domain_name": {"type": "string"},
                 "no_of_users": {"type": "integer"},
-                "no_of_disabled_users": {"type": "integer"}
+                "no_of_disabled_users": {"type": "integer"},
+                "no_of_admin_accounts": {"type": "integer"},
+                "no_of_service_accounts": {"type": "integer"}
+            }
+        },
+        "ADHealth": {
+            "type": "object",
+            "properties": {
+                "evolution": {"type": "object", "description": "Série temporal de usuários e desabilitados"},
+                "latest": {
+                    "type": "object",
+                    "properties": {
+                        "users_total": {"type": "integer"},
+                        "users_disabled": {"type": "integer"},
+                        "admins_active": {"type": "integer"},
+                        "disabled_pct": {"type": "number"},
+                        "service_accounts": {"type": "integer"}
+                    }
+                }
+            }
+        },
+        "SecurityData": {
+            "type": "object",
+            "properties": {
+                "total_alerts": {"type": "integer"},
+                "critical_open": {"type": "integer"},
+                "admin_deletions": {"type": "integer"},
+                "admin_tool_access": {"type": "integer"},
+                "ransomware_indicators": {"type": "integer"},
+                "krbtgt_reset_recommended": {"type": "boolean"},
+                "itsm_integration": {"type": "boolean"},
+                "access_antt": {"type": "integer"},
+                "antt_step_meetings": {"type": "integer"},
+                "timeline": {"type": "object"},
+                "top_users": {"type": "object"},
+                "top_threats": {"type": "object"},
+                "severity_dist": {"type": "object"}
+            }
+        },
+        "DashboardData": {
+            "type": "object",
+            "properties": {
+                "ad_health": {"$ref": "#/definitions/ADHealth"},
+                "security": {"$ref": "#/definitions/SecurityData"},
+                "vulnerabilities": {"type": "object", "properties": {"enable_but_stale": {"type": "integer"}, "executive_accounts": {"type": "integer"}}},
+                "varonis": {"type": "object", "properties": {"events": {"type": "integer"}, "remediation_needed": {"type": "boolean"}}},
+                "ad_vulnerability_map": {"type": "array", "items": {"type":"object"}},
+                "data_exposure": {"type": "object"},
+                "governance": {"type": "object"}
             }
         }
     }
 
-    # Definições de Caminhos (Paths) - Simplificado para o exemplo
-    # (Você pode manter o seu dicionário 'paths' gigante aqui se quiser)
+    # Paths com descrições, tags e resposta de exemplo
     paths = {
         "/api/v1/fileservermetrics": {
             "get": {
                 "tags": ["FileServerMetrics"],
-                "summary": "Lista todas as métricas",
-                "responses": { "200": { "description": "Sucesso", "schema": {"type": "array", "items": {"$ref": "#/definitions/FileServerMetric"}} } }
+                "summary": "Retorna métricas de storage por servidor (últimos snapshots)",
+                "parameters": [
+                    {"name":"file_server","in":"query","required":False,"type":"string","description":"Filtra por nome do servidor"},
+                    {"name":"date_from","in":"query","required":False,"type":"string","format":"date","description":"Data inicial (YYYY-MM-DD)"},
+                    {"name":"date_to","in":"query","required":False,"type":"string","format":"date","description":"Data final (YYYY-MM-DD)"},
+                    {"name":"page","in":"query","required":False,"type":"integer","format":"int32","description":"Página (para paginação)"},
+                    {"name":"page_size","in":"query","required":False,"type":"integer","format":"int32","description":"Tamanho da página"}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lista de métricas",
+                        "schema": {"type": "array", "items": {"$ref": "#/definitions/FileServerMetric"}},
+                        "examples": {
+                            "application/json": [
+                                {
+                                    "date": "2025-01-01",
+                                    "file_server": "SRVB403",
+                                    "no_of_folders": 951533,
+                                    "no_of_files": 8635629,
+                                    "no_of_permission_entries": 2975571,
+                                    "size_of_all_files_and_folders": 17153
+                                }
+                            ]
+                        }
+                    }
+                }
             }
         },
         "/api/v1/securityalerts": {
             "get": {
                 "tags": ["SecurityAlerts"],
-                "summary": "Lista alertas",
-                "responses": { "200": { "description": "Sucesso", "schema": {"type": "array", "items": {"$ref": "#/definitions/SecurityAlert"}} } }
+                "summary": "Lista alertas (filtragem disponível pela API)",
+                "parameters": [
+                    {"name":"status","in":"query","required":False,"type":"string","description":"Filtra por status (ex: Open, Closed)"},
+                    {"name":"severity","in":"query","required":False,"type":"string","description":"Filtra por severidade (Low, Medium, High)"},
+                    {"name":"date_from","in":"query","required":False,"type":"string","format":"date","description":"Data inicial (YYYY-MM-DD)"},
+                    {"name":"date_to","in":"query","required":False,"type":"string","format":"date","description":"Data final (YYYY-MM-DD)"},
+                    {"name":"page","in":"query","required":False,"type":"integer","format":"int32","description":"Página (para paginação)"},
+                    {"name":"page_size","in":"query","required":False,"type":"integer","format":"int32","description":"Tamanho da página"}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lista de alertas",
+                        "schema": {"type": "array", "items": {"$ref": "#/definitions/SecurityAlert"}},
+                        "examples": {
+                            "application/json": [
+                                {
+                                    "threat_model_name": "Activity performed by Admin user from a non-corporate IP address",
+                                    "alert_time": "2025-04-14T15:31:00",
+                                    "file_server_domain": "Exchange Online2",
+                                    "user_name": "Márcia Ketlen Andrade Florêncio (antt.gov.br)",
+                                    "alert_severity": "Medium",
+                                    "alert_category": "Exploitation",
+                                    "status": "Open"
+                                }
+                            ]
+                        }
+                    }
+                }
             }
         },
         "/api/v1/admetrics": {
-             "get": {
+            "get": {
                 "tags": ["ADMetrics"],
-                "summary": "Lista métricas AD",
-                "responses": { "200": { "description": "Sucesso", "schema": {"type": "array", "items": {"$ref": "#/definitions/ADMetric"}} } }
+                "summary": "Métricas do Active Directory por domínio",
+                "responses": {"200": {"description": "Lista de métricas AD", "schema": {"type": "array", "items": {"$ref": "#/definitions/ADMetric"}}}}
+            }
+        },
+        "/api/v1/dashboard_data": {
+            "get": {
+                "tags": ["Dashboard"],
+                "summary": "Dados agregados para o dashboard executivo",
+                "description": "Retorna KPIs e séries temporais usadas pelo dashboard: usuários, admins, contas de serviço, alertas ativos, mapa de vulnerabilidade e exposição de dados.",
+                "responses": {"200": {"description": "Objeto com dados do dashboard", "schema": {"$ref": "#/definitions/DashboardData"}}}
             }
         }
     }
@@ -89,24 +194,34 @@ def generate_swagger_spec():
         "swagger": "2.0",
         "info": {
             "title": "API de Métricas ANTT",
-            "description": "API RESTful para acesso aos dados de métricas de segurança e infraestrutura.",
-            "version": "1.0.0"
+            "description": "API RESTful para acesso aos dados de métricas de segurança e infraestrutura. Fornece endpoints para file-server metrics, AD metrics, alerts e dados agregados para dashboard.",
+            "version": "1.1.0",
+            "contact": {"name": "Equipe Segurança ANTT", "email": "seguranca@antt.gov.br"},
+            "license": {"name": "Proprietary", "url": "https://www.antt.gov.br"}
         },
+        "host": "127.0.0.1:5000",
         "basePath": "/",
         "schemes": ["http"],
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
         "paths": paths,
-        "definitions": definitions
+        "definitions": definitions,
+        "tags": [
+            {"name":"Dashboard","description":"Endpoints para alimentar o dashboard executivo."},
+            {"name":"ADMetrics","description":"Métricas do Active Directory por domínio."},
+            {"name":"SecurityAlerts","description":"Alertas de segurança detectados nas fontes integradas."},
+            {"name":"FileServerMetrics","description":"Métricas de servidores de ficheiros e exposição de dados."}
+        ]
     }
 
     # Salvar na pasta 'static' que o Flask consegue ler
     static_folder = os.path.join(basedir, 'static')
     os.makedirs(static_folder, exist_ok=True)
-    
     output_path = os.path.join(static_folder, 'swagger.json')
     with open(output_path, 'w', encoding='utf-8') as f:
-        json.dump(swagger_spec, f, indent=4)
-    
-    print(f"📄 Swagger JSON gerado em: {output_path}")
+        json.dump(swagger_spec, f, indent=2, ensure_ascii=False)
+
+    print(f"📄 Swagger JSON profissional gerado em: {output_path}")
 
 # ==============================================================================
 # 3. MODELOS DE DADOS (SQLAlchemy)

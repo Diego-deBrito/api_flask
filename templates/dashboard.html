@@ -71,6 +71,13 @@
         .bar-container { background: #334155; height: 6px; border-radius: 3px; width: 100%; margin-top: 5px; }
         .bar-fill { height: 100%; border-radius: 3px; background: var(--accent-red); }
 
+        /* BADGES */
+        .badge { display: inline-block; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; margin: 4px 4px 4px 0; }
+        .badge-danger { background: #7f1d1d; color: #fca5a5; }
+        .badge-warning { background: #78350f; color: #fcd34d; }
+        .badge-info { background: #0c4a6e; color: #7dd3fc; }
+        .badge-success { background: #064e3b; color: #86efac; }
+
         @media (max-width: 900px) { .grid-analysis { grid-template-columns: 1fr; } }
     </style>
 </head>
@@ -105,6 +112,11 @@
             <h3 id="kpi-admins">--</h3>
             <i class="fas fa-user-shield"></i>
         </div>
+        <div class="card kpi-box">
+            <p>Contas de Serviço</p>
+            <h3 id="kpi-service">--</h3>
+            <i class="fas fa-robot"></i>
+        </div>
     </div>
 
     <div class="grid-analysis">
@@ -128,6 +140,7 @@
         <div class="card narrative">
             <h4 style="color: var(--accent-red)"><i class="fas fa-fire"></i> Focos de Incêndio</h4>
             <p id="txt-security-analysis">Carregando...</p>
+            <div id="security-checks" style="margin-top:12px; font-size:0.95rem; color:#cbd5e1"></div>
         </div>
     </div>
 
@@ -139,6 +152,20 @@
         <div class="card">
             <h5 style="color:var(--text-muted); margin-bottom:15px">TOP AMEAÇAS</h5>
             <table id="table-threats"></table>
+        </div>
+    </div>
+
+    <div class="section-header"><i class="fas fa-map-marked-alt me-2"></i> 4. Mapa de Vulnerabilidade do AD & Exposição</div>
+
+    <div class="grid-analysis">
+        <div class="card">
+            <h4 style="margin-bottom:12px; color:var(--text-muted)">Mapa de Vulnerabilidade (domínios)</h4>
+            <table id="table-vuln"></table>
+        </div>
+        <div class="card">
+            <h4 style="margin-bottom:12px; color:var(--text-muted)">Exposição de Dados (por servidor)</h4>
+            <div style="font-size:1.5rem; margin-bottom:10px">Score: <span id="kpi-exposure">--</span></div>
+            <table id="table-exposure"></table>
         </div>
     </div>
 
@@ -185,6 +212,10 @@
                 
                 document.getElementById('txt-ad-analysis').innerHTML = disabledText;
                 document.getElementById('txt-admin-analysis').innerHTML = `Admins Ativos: <b>${ad.admins_active}</b>. Atenção ao acúmulo de privilégios.`;
+                    // Contas de serviço (se disponíveis)
+                    if (ad.service_accounts !== undefined) {
+                        document.getElementById('kpi-service').innerText = fmt(ad.service_accounts);
+                    }
             }
 
             // SEGURANÇA
@@ -193,7 +224,13 @@
                 const secText = sec.total_alerts > 0
                     ? `Detectados <span class="highlight-red">${sec.total_alerts}</span> alertas ativos. Verifique os ofensores abaixo.`
                     : "Nenhum alerta crítico detectado.";
-                document.getElementById('txt-security-analysis').innerHTML = secText;
+                // Acrescenta indicadores importantes: exclusões/desativações, acesso a ferramentas admin, indícios de ransomware
+                let extra = [];
+                if (sec.admin_deletions) extra.push(`<b>${sec.admin_deletions}</b> exclusões/desativações administrativas`);
+                if (sec.admin_tool_access) extra.push(`<b>${sec.admin_tool_access}</b> acessos a ferramentas administrativas detectados`);
+                if (sec.ransomware_indicators) extra.push(`<b>${sec.ransomware_indicators}</b> indícios de ransomware`);
+
+                document.getElementById('txt-security-analysis').innerHTML = secText + (extra.length ? '<br><small style="color:#f8d7da;">' + extra.join(' · ') + '</small>' : '');
 
                 // Tabelas
                 const userTable = document.getElementById('table-users');
@@ -212,6 +249,56 @@
                         threatTable.innerHTML += `<tr><td>${threat.substring(0,25)}...</td><td style="text-align:right;font-weight:bold;color:#ef4444">${count}</td></tr>`;
                     });
                 }
+
+                // Preenche tabela de vulnerabilidade e exposição caso disponíveis
+                if (data.ad_vulnerability_map) {
+                    const tv = document.getElementById('table-vuln');
+                    tv.innerHTML = '<tr><td><b>Domínio</b></td><td style="text-align:right"><b>Score</b></td></tr>';
+                    data.ad_vulnerability_map.forEach(item => {
+                        tv.innerHTML += `<tr><td>${item.domain}</td><td style="text-align:right;color:${item.vuln_score>70?'#ef4444':'#fff'}">${item.vuln_score} (${item.disabled_pct}% desab, ${item.admins} admins)</td></tr>`;
+                    });
+                }
+
+                if (data.data_exposure) {
+                    document.getElementById('kpi-exposure').innerText = data.data_exposure.exposure_score;
+                    const te = document.getElementById('table-exposure');
+                    te.innerHTML = '<tr><td><b>Servidor</b></td><td style="text-align:right"><b>Exposição</b></td></tr>';
+                    (data.data_exposure.servers||[]).forEach(s => {
+                        te.innerHTML += `<tr><td>${s.server}</td><td style="text-align:right">${s.exposure_score} (${fmt(s.permission_entries)} perm)</td></tr>`;
+                    });
+                }
+
+                // Preenche verificações extras (Varonis / AD health) quando disponíveis
+                try {
+                    const checks = [];
+                    if (data.varonis && data.varonis.events) {
+                        const remediation = data.varonis.remediation_needed ? '<span class="badge badge-danger">Remediação necessária</span>' : '';
+                        checks.push(`<div style="margin-bottom:8px"><span class="badge badge-warning">Varonis Events: ${data.varonis.events}</span> ${remediation}</div>`);
+                    }
+                    if (data.vulnerabilities) {
+                        if (data.vulnerabilities.enable_but_stale > 0) {
+                            checks.push(`<div style="margin-bottom:8px"><span class="badge badge-warning">Enable but Stale: ${data.vulnerabilities.enable_but_stale}</span></div>`);
+                        }
+                        if (data.vulnerabilities.executive_accounts > 0) {
+                            checks.push(`<div style="margin-bottom:8px"><span class="badge badge-info">Contas Executivas: ${data.vulnerabilities.executive_accounts}</span></div>`);
+                        }
+                    }
+                    if (data.security && data.security.krbtgt_reset_recommended) {
+                        checks.push(`<div style="margin-bottom:8px"><span class="badge badge-danger">⚠️ KRBTGT: Redefinição recomendada</span></div>`);
+                    }
+                    if (data.security && data.security.itsm_integration) {
+                        checks.push(`<div style="margin-bottom:8px"><span class="badge badge-success">✓ ITSM: Integração detectada</span></div>`);
+                    }
+                    if (data.security && data.security.access_antt > 0) {
+                        checks.push(`<div style="margin-bottom:8px"><span class="badge badge-info">Acessos ANTT: ${data.security.access_antt}</span></div>`);
+                    }
+                    if (data.security && data.security['antt_step_meetings'] > 0) {
+                        checks.push(`<div style="margin-bottom:8px"><span class="badge badge-info">ANTT STEP: ${data.security['antt_step_meetings']} menções</span></div>`);
+                    }
+                    if (checks.length) {
+                        document.getElementById('security-checks').innerHTML = checks.join('');
+                    }
+                } catch (e) { console.warn('Erro ao renderizar verificações extras', e); }
             }
 
             // GOVERNANÇA
